@@ -56,6 +56,11 @@ const ui = {
   loginTabs: $('login-tabs'),
   oauthTab: $('oauth-tab'),
   tokenTab: $('token-tab'),
+  ghTab: $('gh-tab'),
+  ghPanel: $('gh-panel'),
+  ghStatus: $('gh-status'),
+  ghImportBtn: $('gh-import-btn'),
+  ghResults: $('gh-results'),
   oauthPanel: $('oauth-panel'),
   tokenPanel: $('token-panel'),
   tokenInput: $('token-input'),
@@ -1370,17 +1375,31 @@ function resetTokenPanel() {
   ui.tokenLoginBtn.textContent = '登录 / 批量登录';
 }
 
+function resetGhPanel() {
+  ui.ghResults.replaceChildren();
+  ui.ghResults.classList.remove('has-results');
+  ui.ghImportBtn.disabled = true;
+  ui.ghImportBtn.textContent = '从 gh 导入账户';
+  ui.ghStatus.className = 'gh-status';
+  ui.ghStatus.textContent = '正在检测本机 gh…';
+}
+
 function selectLoginTab(tab) {
   state.auth.tab = tab;
-  const oauth = tab === 'oauth';
-  ui.oauthTab.classList.toggle('is-active', oauth);
-  ui.tokenTab.classList.toggle('is-active', !oauth);
-  ui.oauthTab.setAttribute('aria-selected', oauth ? 'true' : 'false');
-  ui.tokenTab.setAttribute('aria-selected', oauth ? 'false' : 'true');
-  ui.oauthPanel.hidden = !oauth;
-  ui.tokenPanel.hidden = oauth;
-  if (!oauth) {
+  const tabs = { oauth: ui.oauthTab, token: ui.tokenTab, gh: ui.ghTab };
+  const panels = { oauth: ui.oauthPanel, token: ui.tokenPanel, gh: ui.ghPanel };
+  for (const [key, button] of Object.entries(tabs)) {
+    const on = key === tab;
+    button.classList.toggle('is-active', on);
+    button.setAttribute('aria-selected', on ? 'true' : 'false');
+    panels[key].hidden = !on;
+  }
+  if (tab === 'token') {
     requestAnimationFrame(() => ui.tokenInput.focus());
+    return;
+  }
+  if (tab === 'gh') {
+    loadGhStatus();
     return;
   }
   if (state.config.clientId) {
@@ -1391,12 +1410,61 @@ function selectLoginTab(tab) {
   }
 }
 
+async function loadGhStatus() {
+  ui.ghStatus.className = 'gh-status';
+  ui.ghStatus.textContent = '正在检测本机 gh…';
+  ui.ghImportBtn.disabled = true;
+  try {
+    const data = await api('/api/gh/status');
+    if (!data.available) {
+      ui.ghStatus.className = 'gh-status is-warn';
+      ui.ghStatus.textContent = `${data.message || '未检测到 GitHub CLI'}。`;
+      return;
+    }
+    if (!data.logins.length) {
+      ui.ghStatus.className = 'gh-status is-warn';
+      ui.ghStatus.textContent = 'gh 已安装，但未登录任何 github.com 账户。先执行 gh auth login。';
+      return;
+    }
+    ui.ghStatus.textContent = `检测到 gh 已登录：${data.logins.join('、')}`;
+    ui.ghImportBtn.disabled = false;
+  } catch (error) {
+    ui.ghStatus.className = 'gh-status is-warn';
+    ui.ghStatus.textContent = `检测失败：${error.message}`;
+  }
+}
+
+async function importFromGh() {
+  const restore = setBusy(ui.ghImportBtn, '导入中…');
+  ui.ghResults.replaceChildren();
+  ui.ghResults.classList.remove('has-results');
+  try {
+    const data = await api('/api/gh/import', { method: 'POST' });
+    renderTokenResults(data, ui.ghResults);
+    await refreshBootstrap();
+    if (data.added + data.updated > 0) {
+      await loadRepos();
+      await loadOverview();
+      showToast(`已从 gh 导入 ${data.added + data.updated} 个账户`, 'success');
+    } else {
+      showToast('没有从 gh 导入账户', 'error');
+    }
+  } catch (error) {
+    ui.ghStatus.className = 'gh-status is-warn';
+    ui.ghStatus.textContent = error.message;
+    showToast(error.message, 'error');
+  } finally {
+    restore();
+  }
+}
+
 function openAddDialog() {
   stopPolling();
   state.auth.mode = 'add';
   state.auth.flowId = null;
   resetAuthPanel();
   resetTokenPanel();
+  resetGhPanel();
   ui.loginTabs.hidden = false;
   ui.dialogTitle.textContent = '添加 GitHub 账户';
   ui.dialogLead.textContent =
@@ -1419,9 +1487,11 @@ function openSettingsDialog() {
   state.auth.flowId = null;
   resetAuthPanel();
   resetTokenPanel();
+  resetGhPanel();
   ui.loginTabs.hidden = true;
   ui.oauthPanel.hidden = false;
   ui.tokenPanel.hidden = true;
+  ui.ghPanel.hidden = true;
   ui.dialogTitle.textContent = 'OAuth App 设置';
   ui.dialogLead.textContent =
     '修改 Client ID 后，新添加的账户会使用新的 OAuth App；已登录账户不受影响。';
@@ -1458,10 +1528,10 @@ async function saveConfig() {
   }
 }
 
-function renderTokenResults(data) {
-  ui.tokenResults.replaceChildren();
-  ui.tokenResults.classList.add('has-results');
-  ui.tokenResults.append(
+function renderTokenResults(data, container = ui.tokenResults) {
+  container.replaceChildren();
+  container.classList.add('has-results');
+  container.append(
     el(
       'div',
       { class: 'star-summary' },
@@ -1475,7 +1545,7 @@ function renderTokenResults(data) {
     const badge = result.ok
       ? el('span', { class: 'result-badge ok', text: '成功' })
       : el('span', { class: 'result-badge fail', text: '失败' });
-    ui.tokenResults.append(
+    container.append(
       el(
         'div',
         { class: 'token-result-row' },
@@ -1688,12 +1758,16 @@ function bind() {
   ui.tokenLoginBtn.addEventListener('click', tokenLogin);
   ui.oauthTab.addEventListener('click', () => selectLoginTab('oauth'));
   ui.tokenTab.addEventListener('click', () => selectLoginTab('token'));
+  ui.ghTab.addEventListener('click', () => selectLoginTab('gh'));
+  ui.ghImportBtn.addEventListener('click', importFromGh);
   ui.loginTabs.addEventListener('keydown', (event) => {
     if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
     event.preventDefault();
-    const tab = state.auth.tab === 'oauth' ? 'token' : 'oauth';
-    selectLoginTab(tab);
-    (tab === 'oauth' ? ui.oauthTab : ui.tokenTab).focus();
+    const order = ['oauth', 'token', 'gh'];
+    const step = event.key === 'ArrowRight' ? 1 : -1;
+    const next = order[(order.indexOf(state.auth.tab) + step + order.length) % order.length];
+    selectLoginTab(next);
+    ({ oauth: ui.oauthTab, token: ui.tokenTab, gh: ui.ghTab })[next].focus();
   });
   ui.dialog.addEventListener('close', () => {
     stopPolling();

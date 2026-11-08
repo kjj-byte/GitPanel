@@ -1160,6 +1160,17 @@ a:hover {
   line-height: 1.6;
 }
 
+.gh-status {
+  margin: 8px 0 12px;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--muted);
+}
+
+.gh-status.is-warn {
+  color: var(--warning);
+}
+
 .token-input {
   height: auto;
   min-height: 140px;
@@ -2192,6 +2203,54 @@ a:hover {
   .toast {
     right: 12px;
     bottom: 12px;
+  }
+}
+
+/* 手机 / 安卓适配：安全区留白 + 避免输入框聚焦自动放大 + 触控目标够大。
+   （≤600px 上的细化，配合上面的 900/600 断点。） */
+@media (max-width: 900px) {
+  .sidebar {
+    padding-left: max(16px, env(safe-area-inset-left));
+    padding-right: max(16px, env(safe-area-inset-right));
+  }
+
+  .main {
+    padding-left: max(18px, env(safe-area-inset-left));
+    padding-right: max(18px, env(safe-area-inset-right));
+    padding-bottom: calc(44px + env(safe-area-inset-bottom));
+  }
+}
+
+@media (max-width: 600px) {
+  /* 输入框字号 <16px 会让安卓 Chrome 聚焦时强制放大页面。 */
+  .input,
+  .token-input {
+    font-size: 16px;
+  }
+
+  /* 触控目标至少 ~40px，图标按钮不小于 40。 */
+  .btn-sm {
+    min-height: 40px;
+    padding: 0 14px;
+    font-size: 13px;
+  }
+
+  .icon-button {
+    width: 40px;
+    height: 40px;
+  }
+
+  .dialog {
+    width: calc(100vw - 16px);
+    max-height: calc(100vh - 24px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+    border-radius: 16px;
+  }
+
+  .toast {
+    left: max(12px, env(safe-area-inset-left));
+    right: max(12px, env(safe-area-inset-right));
+    bottom: calc(12px + env(safe-area-inset-bottom));
+    max-width: none;
   }
 }
 

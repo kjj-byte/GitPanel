@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 process.env.GITHUB_PANEL_SECRET = 'test-secret-for-core-tests';
-const { createSession, normalizeRepo, normalizeWebUrl, open, seal, verifySession } = await import('../lib.mjs');
+const { createSession, normalizeRepo, normalizeWebUrl, open, parseGhAccounts, seal, verifySession } = await import('../lib.mjs');
 
 test('normalizeWebUrl accepts http/https and bare hosts', () => {
   const cases = new Map([
@@ -47,6 +47,26 @@ test('normalizeRepo rejects ambiguous or unsafe input', () => {
     undefined,
   ]) {
     assert.equal(normalizeRepo(input), null, String(input));
+  }
+});
+
+test('parseGhAccounts extracts only logged-in github.com accounts with tokens', () => {
+  const json = JSON.stringify({
+    hosts: {
+      'github.com': [
+        { state: 'success', login: 'alice', token: 'gho_aaa' },
+        { state: 'failed', login: 'bob', token: 'gho_bbb' },
+        { state: 'success', login: 'carol' },
+      ],
+      'ghe.example.com': [{ state: 'success', login: 'dave', token: 'gho_ddd' }],
+    },
+  });
+  assert.deepEqual(parseGhAccounts(json), [{ login: 'alice', token: 'gho_aaa' }]);
+});
+
+test('parseGhAccounts tolerates missing or malformed hosts', () => {
+  for (const input of ['{}', '{"hosts":{}}', '{"hosts":{"github.com":null}}']) {
+    assert.deepEqual(parseGhAccounts(input), [], input);
   }
 });
 

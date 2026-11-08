@@ -222,6 +222,17 @@ export function normalizeRepo(input) {
   return value;
 }
 
+// 从 `gh auth status --json hosts --show-token` 的输出提取 github.com 账户（登录名 + 明文 token）。
+// 只认 state=success 且有 token 的条目；token 不会离开本机服务。
+export function parseGhAccounts(json) {
+  const hosts = JSON.parse(json)?.hosts;
+  const entries = hosts && typeof hosts === 'object' ? hosts['github.com'] : null;
+  if (!Array.isArray(entries)) return [];
+  return entries
+    .filter((entry) => entry && entry.state === 'success' && typeof entry.token === 'string' && entry.login)
+    .map((entry) => ({ login: String(entry.login), token: entry.token }));
+}
+
 export function publicAccount(account) {
   return {
     id: account.id,

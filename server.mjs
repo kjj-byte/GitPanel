@@ -14,6 +14,7 @@ import {
   MAX_CUSTOM_LINKS,
   normalizeRepo,
   normalizeWebUrl,
+  parseGhAccounts,
   publicAccount,
   readState,
   SESSION_TTL_MS,
@@ -184,6 +185,39 @@ async function githubOAuth(pathname, body) {
     throw error;
   }
   return data;
+}
+
+// 调用本机已登录的 GitHub CLI（gh），复用其凭据。gh 不在 PATH 或未登录时报 400，
+// 前端据此隐藏/禁用导入入口。仅本机使用，stdout 里的 token 不会回传给浏览器。
+function runGh(args) {
+  return new Promise((resolve, reject) => {
+    let child;
+    try {
+      child = spawn('gh', args, { windowsHide: true });
+    } catch (error) {
+      const wrapped = new Error('未检测到 GitHub CLI（gh），请先安装并登录：gh auth login');
+      wrapped.status = 400;
+      wrapped.code = 'GH_NOT_FOUND';
+      return reject(wrapped);
+    }
+    let out = '';
+    let err = '';
+    child.stdout.on('data', (chunk) => (out += chunk));
+    child.stderr.on('data', (chunk) => (err += chunk));
+    child.on('error', () => {
+      const wrapped = new Error('未检测到 GitHub CLI（gh），请先安装并登录：gh auth login');
+      wrapped.status = 400;
+      wrapped.code = 'GH_NOT_FOUND';
+      reject(wrapped);
+    });
+    child.on('close', (code) => {
+      if (code === 0) return resolve(out);
+      const wrapped = new Error(err.trim() || `gh 退出码 ${code}`);
+      wrapped.status = 400;
+      wrapped.code = 'GH_ERROR';
+      reject(wrapped);
+    });
+  });
 }
 
 async function githubApi(pathname, token) {
@@ -545,6 +579,87 @@ async function handleApi(req, res, url) {
       added,
       updated,
       failed: results.filter((result) => !result.ok).length,
+      activeId: state.activeId,
+    });
+  }
+
+  // GitHub CLI 适配：读取本机 `gh` 已登录的账户（仅 github.com），供面板一键导入复用。
+  if (req.method === 'GET' && pathname === '/api/gh/status') {
+    try {
+      const accounts = parseGhAccounts(await runGh(['auth', 'status', '--json', 'hosts', '--show-token']));
+      return sendJson(res, 200, { available: true, logins: accounts.map((a) => a.login) });
+    } catch (error) {
+      return sendJson(res, 200, { available: false, reason: error.code || 'GH_ERROR', message: error.message });
+    }
+  }
+
+  if (req.method === 'POST' && pathname === '/api/gh/import') {
+    let ghAccounts;
+    try {
+      ghAccounts = parseGhAccounts(await runGh(['auth', 'status', '--json', 'hosts', '--show-token']));
+    } catch (error) {
+      return sendJson(res, error.status || 400, { error: error.code || 'GH_ERROR', message: error.message });
+    }
+    if (!ghAccounts.length) {
+      return sendJson(res, 400, { error: 'GH_NO_ACCOUNTS', message: 'gh 未登录任何 github.com 账户，请先 gh auth login' });
+    }
+    // 逐个用 token 校验 /user，成功则复用账户合并逻辑（与 Token 批量登录一致）。
+    const results = await Promise.all(
+      ghAccounts.map(async ({ login, token }) => {
+        try {
+          const user = await githubApi('/user', token);
+          if (!user?.id || !user?.login) throw new Error('GitHub 未返回有效用户信息');
+          return {
+            ok: true,
+            account: {
+              id: String(user.id),
+              login: user.login,
+              name: user.name || '',
+              avatarUrl: user.avatar_url,
+              htmlUrl: user.html_url,
+              token,
+              scopes: '',
+              addedAt: Date.now(),
+            },
+          };
+        } catch (error) {
+          return { ok: false, login, message: error.status === 401 ? 'Token 无效或已过期' : error.message || '验证失败' };
+        }
+      }),
+    );
+    const successes = results.filter((r) => r.ok);
+    let added = 0;
+    let updated = 0;
+    if (successes.length) {
+      await mutateState((next) => {
+        for (const result of successes) {
+          const account = result.account;
+          const index = next.accounts.findIndex((item) => item.id === account.id);
+          if (index >= 0) {
+            next.accounts[index] = { ...next.accounts[index], ...account, addedAt: next.accounts[index].addedAt };
+            result.action = 'updated';
+            updated += 1;
+          } else {
+            next.accounts.push(account);
+            result.action = 'added';
+            added += 1;
+          }
+        }
+        next.activeId = successes[successes.length - 1].account.id;
+      });
+    }
+    return sendJson(res, 200, {
+      results: results.map((r, i) => ({
+        index: i + 1,
+        ok: r.ok,
+        login: r.account?.login || r.login || '',
+        name: r.account?.name || '',
+        action: r.action || '',
+        message: r.ok ? (r.action === 'updated' ? '已更新授权' : '已添加') : r.message,
+      })),
+      added,
+      updated,
+      failed: results.filter((r) => !r.ok).length,
       activeId: state.activeId,
     });
   }

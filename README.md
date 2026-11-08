@@ -35,6 +35,7 @@
 
 **账户管理**
 - OAuth 设备流授权（单次授权一个账户）与 Token 登录（单次 / 批量，单次最多 50 个）。
+- 复用本机已登录的 GitHub CLI（`gh`）账户，一键导入无需粘贴 Token。
 - 多账户切换；账户搜索；账户备注（区分工作号 / 个人号等）。
 - 账户健康检查：一键批量校验所有账户令牌是否仍有效、权限是否够用。
 
@@ -102,6 +103,15 @@ npm start
 
 > Fine-grained PAT 需能读取用户信息并有目标仓库的 Star 权限；权限名因策略而异，不确定时用 Classic PAT。
 
+### 方式三：复用本机 GitHub CLI（gh）
+
+若本机已安装并登录过 [GitHub CLI](https://cli.github.com/)（`gh auth login`），无需再粘贴 Token：
+
+1. 「添加账户」→「GitHub CLI」标签，面板自动检测本机 `gh` 已登录的 `github.com` 账户。
+2. 点「从 gh 导入账户」，即用 `gh` 的凭据登录对应账户（token 只在本机加密保存，不回显、不发往浏览器）。
+
+> 面板通过本机子进程调用 `gh auth status --json hosts --show-token` 读取凭据，仅支持 `github.com`（不含 GHES 私有域名）。未安装时先 `winget install GitHub.cli` 再 `gh auth login`。
+
 ## 功能说明
 
 **Star 项目**：侧边栏输入 `owner/repo`、项目链接或点仓库卡片的「Star」；选择全部 / 前 N 个 / 指定账户，逐账户显示结果。Star 是幂等操作，重复点击不会重复记录。
@@ -153,7 +163,7 @@ npm start
 
 ```text
 .
-├── server.mjs          # HTTP 服务与全部 /api 路由（登录、仓库、Star、统计、导出等）
+├── server.mjs          # HTTP 服务与全部 /api 路由（登录、gh 导入、仓库、Star、统计、导出等）
 ├── lib.mjs             # 加密存储、会话签名、Star 历史采样等工具
 ├── start.bat           # Windows 启动脚本（自动找端口、开浏览器）
 ├── package.json
@@ -172,16 +182,18 @@ npm start
 npm test
 ```
 
-覆盖：仓库地址解析、会话签名 / 过期 / 篡改、加密状态篡改与损坏容错、服务器启动、Cookie、CSP、Client ID 校验、跨站请求拦截；并通过 mock GitHub 完整验证设备授权、Token 单次 / 批量登录、公开与私有仓库加载、单 / 多账户 Star、取消 Star、账户健康检查、账户详情、收藏汇总、仓库详情增强、Fork、CSV 导出、功能开关等。
+覆盖：仓库地址解析、gh 输出解析、会话签名 / 过期 / 篡改、加密状态篡改与损坏容错、服务器启动、Cookie、CSP、Client ID 校验、跨站请求拦截；并通过 mock GitHub 完整验证设备授权、Token 单次 / 批量登录、公开与私有仓库加载、单 / 多账户 Star、取消 Star、账户健康检查、账户详情、收藏汇总、仓库详情增强、Fork、CSV 导出、功能开关等。
 
 ## 已知范围与限制
 
 - 只浏览**公开与私有仓库**；私有仓库需 Token 具备 `repo` 权限。
+- 界面已适配手机 / 安卓浏览器（响应式布局、安全区留白、触控友好、输入框不自动放大）。因面板只监听 `127.0.0.1` 且校验 Host，手机需通过本机浏览器/安卓模拟器访问（`127.0.0.1`），不经局域网 IP（会被拒绝）。
 - 每个账户最多加载最近更新 / 推送的 100 个仓库。
 - Token 登录单次最多 50 个；重复 Token 自动去重。
 - Star 增长曲线依赖本地采样，首次使用时只有当前值，需多次打开或开启每日快照后才有趋势。
 - 跨账户总览 / 收藏汇总会为每个账户请求 GitHub，账户较多时首次加载略慢（有 60 秒短缓存）。
 - OAuth 设备流不提供 refresh token，授权失效时需移除后重新添加。
+- gh 导入依赖本机 `gh` 已登录且为 `github.com`；GHES 私有域名账户请用 Token 登录。
 
 ## 常见问题
 

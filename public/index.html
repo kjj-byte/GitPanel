@@ -2,8 +2,9 @@
 <html lang="zh-CN">
   <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <meta name="color-scheme" content="dark" />
+    <meta name="theme-color" content="#0d1218" />
     <title>GitHub 多账户面板</title>
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <link rel="stylesheet" href="/styles.css" />
@@ -253,6 +254,16 @@
           >
             Token 登录
           </button>
+          <button
+            class="login-tab"
+            id="gh-tab"
+            type="button"
+            role="tab"
+            aria-selected="false"
+            aria-controls="gh-panel"
+          >
+            GitHub CLI
+          </button>
         </div>
 
         <div id="oauth-panel" role="tabpanel" aria-labelledby="oauth-tab">
@@ -371,6 +382,21 @@
             登录 / 批量登录
           </button>
           <div class="token-results" id="token-results" aria-live="polite"></div>
+        </div>
+
+        <div id="gh-panel" role="tabpanel" aria-labelledby="gh-tab" hidden>
+          <p class="token-lead">
+            直接复用本机已登录的 GitHub CLI（<code>gh</code>）账户，无需再粘贴 Token。
+          </p>
+          <p class="gh-status" id="gh-status">正在检测本机 gh…</p>
+          <button class="btn btn-primary btn-block" id="gh-import-btn" type="button" disabled>
+            从 gh 导入账户
+          </button>
+          <p class="field-hint">
+            未安装 gh？先执行 <code>winget install GitHub.cli</code>，再 <code>gh auth login</code>。
+            导入的 token 只在本机加密保存，不会回显。
+          </p>
+          <div class="token-results" id="gh-results" aria-live="polite"></div>
         </div>
 
         <p class="dialog-footnote">
