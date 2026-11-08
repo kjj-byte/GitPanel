@@ -1,0 +1,14 @@
+{
+  "name": "github-account-panel",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Local multi-account GitHub panel with OAuth device flow and one-click starring across accounts.",
+  "scripts": {
+    "start": "node server.mjs",
+    "test": "node --test test/core.test.mjs test/server.test.mjs test/github-mock.test.mjs"
+  },
+  "engines": {
+    "node": ">=20.11"
+  }
+}

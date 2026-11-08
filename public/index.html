@@ -1,0 +1,386 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="dark" />
+    <title>GitHub 多账户面板</title>
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <div class="app">
+      <aside class="sidebar">
+        <div class="brand">
+          <div class="brand-mark" aria-hidden="true">GH</div>
+          <div>
+            <p class="brand-title">GitHub 账户</p>
+            <p class="brand-sub">多账户管理面板</p>
+          </div>
+        </div>
+
+        <div class="sidebar-heading">
+          <span>已登录账户</span>
+          <span class="count" id="account-count">0</span>
+        </div>
+        <div class="account-search" id="account-search-wrap" hidden>
+          <label class="sr-only" for="account-search">搜索账户</label>
+          <input
+            class="input account-search-input"
+            id="account-search"
+            type="search"
+            placeholder="搜索账户…"
+            autocomplete="off"
+            spellcheck="false"
+          />
+        </div>
+        <nav class="account-list" id="account-list" aria-label="已登录的 GitHub 账户"></nav>
+        <p class="sidebar-empty" id="account-search-empty" hidden>没有匹配的账户。</p>
+        <p class="sidebar-empty" id="sidebar-empty" hidden>还没有账户，先添加一个。</p>
+
+        <button class="btn btn-primary btn-block" id="add-account-btn" type="button">
+          <span class="btn-icon" aria-hidden="true">+</span>
+          添加账户
+        </button>
+
+        <section class="side-star" aria-labelledby="side-star-title">
+          <div class="side-star-head">
+            <span id="side-star-title">为项目 Star</span>
+          </div>
+          <form class="side-star-form" id="star-form">
+            <label class="sr-only" for="repo-input">项目</label>
+            <input
+              class="input"
+              id="repo-input"
+              name="repo"
+              placeholder="owner/repo 或链接"
+              autocomplete="off"
+              spellcheck="false"
+            />
+            <div class="star-target">
+              <label class="sr-only" for="star-target-select">Star 的对象</label>
+              <select class="input star-select" id="star-target-select">
+                <option value="all">全部账户</option>
+                <option value="count">前 N 个账户</option>
+                <option value="pick">指定账户</option>
+              </select>
+            </div>
+            <div class="star-count-row" id="star-count-row" hidden>
+              <label class="sr-only" for="star-count-input">账户数量</label>
+              <input
+                class="input star-count-input"
+                id="star-count-input"
+                type="number"
+                min="1"
+                step="1"
+                value="1"
+              />
+              <span class="star-count-hint" id="star-count-hint"></span>
+            </div>
+            <div class="star-pick-list" id="star-pick-list" hidden></div>
+            <button class="btn btn-primary btn-block" id="star-all-btn" type="submit" disabled>
+              Star
+            </button>
+          </form>
+          <div class="star-results" id="star-results" aria-live="polite"></div>
+        </section>
+
+        <nav class="side-explore" id="side-explore" data-feature="exploreLinks" aria-label="发现">
+          <div class="side-explore-head">发现 · 趋势</div>
+          <div class="side-explore-list" id="explore-list"></div>
+          <form class="explore-add" id="explore-add-form">
+            <input
+              class="explore-add-input"
+              id="explore-add-url"
+              type="text"
+              inputmode="url"
+              autocomplete="off"
+              placeholder="添加自定义网址，如 example.com"
+              aria-label="自定义网址"
+            />
+            <button class="btn btn-ghost btn-sm" id="explore-add-btn" type="submit">添加</button>
+          </form>
+        </nav>
+
+        <div class="sidebar-spacer"></div>
+
+        <div class="security-note">
+          <span class="status-dot" aria-hidden="true"></span>
+          <div>
+            <p>本地加密存储</p>
+            <p>登录状态 30 天，随操作自动续期</p>
+          </div>
+        </div>
+        <button class="link-button" id="settings-btn" type="button">OAuth 设置</button>
+      </aside>
+
+      <main class="main">
+        <header class="topbar">
+          <div>
+            <p class="eyebrow">当前浏览账户</p>
+            <div class="active-account" id="active-account">
+              <span class="muted">尚未添加账户</span>
+            </div>
+          </div>
+          <button class="btn btn-ghost" id="refresh-repos-btn" type="button" disabled>
+            刷新
+          </button>
+        </header>
+
+        <section class="overview" aria-labelledby="overview-title">
+          <div class="section-head">
+            <div>
+              <h2 id="overview-title">多账户总览</h2>
+              <p>所有已登录账户的仓库、Star 与 Fork 汇总。单账户做不到的跨账户统计。</p>
+            </div>
+            <div class="overview-tools" id="overview-tools">
+              <span class="repo-count" id="overview-count"></span>
+              <button class="btn btn-ghost btn-sm" id="health-btn" type="button" data-feature="healthCheck">
+                健康检查
+              </button>
+              <button class="btn btn-ghost btn-sm" id="starred-overview-btn" type="button" data-feature="starredOverview">
+                收藏汇总
+              </button>
+              <div class="export-wrap" id="export-wrap" data-feature="exportData">
+                <button class="btn btn-ghost btn-sm" id="export-btn" type="button">导出</button>
+                <div class="export-menu" id="export-menu" hidden>
+                  <button type="button" data-export="accounts">账户清单 CSV</button>
+                  <button type="button" data-export="starred">收藏清单 CSV</button>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="stat-grid" id="stat-grid"></div>
+          <div class="overview-extra" id="overview-extra"></div>
+        </section>
+
+        <section class="repos-section" aria-labelledby="repos-title">
+          <div class="section-head">
+            <div>
+              <h2 id="repos-title">项目</h2>
+              <p id="repos-subtitle">选择左侧账户后加载其项目。</p>
+            </div>
+            <div class="repo-tools">
+              <div class="repo-search">
+                <label class="sr-only" for="repo-search-input">搜索项目</label>
+                <input
+                  class="input repo-search-input"
+                  id="repo-search-input"
+                  type="search"
+                  placeholder="搜索项目名…"
+                  autocomplete="off"
+                  spellcheck="false"
+                />
+              </div>
+              <div class="repo-sort" id="repo-sort-wrap" data-feature="repoSort">
+                <label class="sr-only" for="repo-sort-select">排序</label>
+                <select class="input repo-sort-select" id="repo-sort-select">
+                  <option value="updated">最近更新</option>
+                  <option value="stars">Star 最多</option>
+                  <option value="name">名称</option>
+                </select>
+              </div>
+              <div class="repo-tabs" id="repo-tabs" role="tablist" aria-label="项目分类">
+                <button class="repo-tab is-active" type="button" role="tab" aria-selected="true" data-tab="public">
+                  公开 <span class="tab-count" id="tab-count-public"></span>
+                </button>
+                <button class="repo-tab" type="button" role="tab" aria-selected="false" data-tab="private">
+                  私有 <span class="tab-count" id="tab-count-private"></span>
+                </button>
+                <button class="repo-tab" type="button" role="tab" aria-selected="false" data-tab="starred">
+                  收藏 <span class="tab-count" id="tab-count-starred"></span>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div class="repo-grid" id="repo-grid"></div>
+          <div class="empty-state" id="repos-empty" hidden>
+            <div class="empty-art" aria-hidden="true">⌘</div>
+            <h3 id="repos-empty-title">还没有可浏览的项目</h3>
+            <p id="repos-empty-text">添加账户并选择它，就能看到它的项目。</p>
+            <button class="btn btn-secondary" id="empty-add-btn" type="button" hidden>
+              添加第一个账户
+            </button>
+          </div>
+        </section>
+      </main>
+
+      <dialog class="dialog detail-dialog" id="repo-detail-dialog" aria-labelledby="detail-title">
+        <form method="dialog" class="dialog-close-form">
+          <button class="icon-button" type="submit" aria-label="关闭">×</button>
+        </form>
+        <div class="dialog-body" id="repo-detail-body"></div>
+      </dialog>
+
+      <dialog class="dialog detail-dialog" id="info-dialog">
+        <form method="dialog" class="dialog-close-form">
+          <button class="icon-button" type="submit" aria-label="关闭">×</button>
+        </form>
+        <div class="dialog-body" id="info-body"></div>
+      </dialog>
+    </div>
+
+    <dialog class="dialog" id="add-dialog" aria-labelledby="dialog-title" aria-describedby="dialog-lead">
+      <form method="dialog" class="dialog-close-form">
+        <button class="icon-button" type="submit" aria-label="关闭">×</button>
+      </form>
+      <div class="dialog-body">
+        <div class="dialog-icon" aria-hidden="true">GH</div>
+        <h2 id="dialog-title">添加 GitHub 账户</h2>
+        <p class="dialog-lead" id="dialog-lead">
+          使用 OAuth 授权，或粘贴一个/多个 Token 登录。面板不会接触你的密码或浏览器 Cookie。
+        </p>
+
+        <div class="login-tabs" id="login-tabs" role="tablist" aria-label="登录方式">
+          <button
+            class="login-tab is-active"
+            id="oauth-tab"
+            type="button"
+            role="tab"
+            aria-selected="true"
+            aria-controls="oauth-panel"
+          >
+            OAuth 授权
+          </button>
+          <button
+            class="login-tab"
+            id="token-tab"
+            type="button"
+            role="tab"
+            aria-selected="false"
+            aria-controls="token-panel"
+          >
+            Token 登录
+          </button>
+        </div>
+
+        <div id="oauth-panel" role="tabpanel" aria-labelledby="oauth-tab">
+          <div id="config-view" hidden>
+            <div class="config-steps">
+              <p><strong>一次性设置：</strong>创建一个 GitHub OAuth App，并勾选 Enable Device Flow。</p>
+              <ol>
+                <li>打开 GitHub → Settings → Developer settings → OAuth Apps → New OAuth App。</li>
+                <li>Homepage URL 填 <code id="home-url">http://127.0.0.1:7788</code>，Callback URL 可填同一地址。</li>
+                <li>创建后复制 <strong>Client ID</strong>（不是 Client Secret）。</li>
+              </ol>
+              <p class="field-hint">
+                Client ID 是公开信息，只用于发起设备授权，不会泄露账户。
+              </p>
+            </div>
+            <label class="field-label" for="client-id-input">OAuth App Client ID</label>
+            <input
+              class="input"
+              id="client-id-input"
+              placeholder="例如 Ov23li… 或 Iv1.…"
+              autocomplete="off"
+              spellcheck="false"
+            />
+            <p class="field-hint" id="config-source"></p>
+            <button class="btn btn-primary btn-block" id="save-config-btn" type="button">
+              保存并继续
+            </button>
+
+            <div class="feature-settings">
+              <p class="feature-settings-title">功能开关</p>
+              <p class="field-hint">关闭后对应入口会隐藏，数据不会被删除。</p>
+              <div class="feature-list" id="feature-list"></div>
+            </div>
+          </div>
+
+          <div id="auth-view">
+            <div id="auth-start">
+              <ol class="steps">
+                <li><span>1</span>点击下方按钮生成一次性授权码。</li>
+                <li><span>2</span>在 GitHub 页面登录目标账户并输入代码。</li>
+                <li><span>3</span>授权完成后账户会自动出现在左栏。</li>
+              </ol>
+              <button class="btn btn-primary btn-block" id="start-auth-btn" type="button">
+                使用 GitHub 授权
+              </button>
+            </div>
+
+            <div id="auth-wait" hidden>
+              <p class="field-label">在 GitHub 页面输入此代码</p>
+              <div class="device-code-row">
+                <code id="device-code">----</code>
+                <button class="btn btn-ghost" id="copy-code-btn" type="button">复制</button>
+              </div>
+              <a
+                class="btn btn-secondary btn-block"
+                id="verify-link"
+                href="https://github.com/login/device"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                打开 GitHub 授权页
+              </a>
+              <p class="auth-status" id="auth-status">等待 GitHub 授权…</p>
+              <button class="link-button" id="restart-auth-btn" type="button">重新开始</button>
+            </div>
+          </div>
+        </div>
+
+        <div id="token-panel" role="tabpanel" aria-labelledby="token-tab" hidden>
+          <p class="token-lead">
+            每行一个 Token；只填一行就是单次登录。未配置 OAuth App 也可以使用。
+          </p>
+          <label class="field-label" for="token-input">GitHub Token</label>
+          <textarea
+            class="input token-input"
+            id="token-input"
+            rows="6"
+            placeholder="ghp_...&#10;github_pat_..."
+            autocomplete="off"
+            spellcheck="false"
+          ></textarea>
+          <p class="field-hint">
+            Token 只发送到本机服务并加密保存，结果中不会回显。单次最多 50 个。
+          </p>
+
+          <details class="token-help">
+            <summary>如何获取 Token？</summary>
+            <div class="token-help-body">
+              <p><strong>Classic PAT（推荐）</strong></p>
+              <ol>
+                <li>
+                  登录目标 GitHub 账户，打开
+                  <a
+                    href="https://github.com/settings/tokens"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >Settings → Developer settings → Personal access tokens</a>。
+                </li>
+                <li>选择 <strong>Tokens (classic) → Generate new token (classic)</strong>。</li>
+                <li>
+                  勾选 <code>read:user</code> 和 <code>public_repo</code>，生成后立即复制
+                  <code>ghp_...</code>。
+                </li>
+                <li>每行粘贴一个 Token；多个账户分别登录后重复以上步骤。</li>
+              </ol>
+              <p>
+                <strong>Fine-grained PAT</strong>：需要能读取用户信息，并具备 Star
+                目标仓库的权限；不确定时用 Classic PAT。登录成功只代表能读取账户，Star
+                仍可能因权限不足失败。
+              </p>
+              <p>Token 等同密码，只在本机使用；批量最多 50 个，空行和重复 Token 会自动跳过。</p>
+            </div>
+          </details>
+
+          <button class="btn btn-primary btn-block" id="token-login-btn" type="button">
+            登录 / 批量登录
+          </button>
+          <div class="token-results" id="token-results" aria-live="polite"></div>
+        </div>
+
+        <p class="dialog-footnote">
+          OAuth 授权范围：read:user、public_repo。Token 登录需要至少能读取用户信息；Star 需要
+          public_repo 或对应仓库的 Star 权限。移除账户只删除本地令牌，不会自动撤销 GitHub 授权。
+        </p>
+      </div>
+    </dialog>
+
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+    <script type="module" src="/app.js"></script>
+  </body>
+</html>
